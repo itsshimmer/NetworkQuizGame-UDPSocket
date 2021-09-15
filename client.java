@@ -20,8 +20,8 @@ public class client {
         clientSocket.send(sendPacket);
     }
 
-    private static String receivePacket() throws Exception {
-        byte[] receiveData = new byte[1];
+    private static String receivePacket(int bytes) throws Exception {
+        byte[] receiveData = new byte[bytes];
         DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
 
         // while que controla o recebimento de resposta
@@ -36,6 +36,20 @@ public class client {
         }
         return new String(receivePacket.getData());
     }
+
+    private static void validateConnection() throws Exception {
+        while(true) {
+            lastSentData = "connect";
+            sendPacket();
+            String response = receivePacket(3);
+            if(response.equals("ack")) {
+                lastSentData = "ack";
+                sendPacket();
+                System.out.println("Connection validated successfully!");
+                break;
+            }
+        }
+    }
     public static void main(String[] args) throws Exception {
 
         // declara socket cliente
@@ -44,20 +58,7 @@ public class client {
         ipAddress = InetAddress.getByName(host);
         
         while (true) {
-
-            // while para validar a conexao
-            while(true) {
-                lastSentData = "c";
-                sendPacket();
-                String response = receivePacket();
-                if(response.equals("k")) {
-                    lastSentData = "k";
-                    sendPacket();
-                    System.out.println("Connection validated successfully!");
-                    break;
-                }
-            }
-
+            validateConnection();
             // Send start game packet
             break;
 

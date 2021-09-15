@@ -11,6 +11,7 @@ public class server {
     static int clientPort;
 
     static String lastSentData;
+    static String lastReceivedContent;
 
     private static void sendPacket() throws Exception {
         byte[] sendData = lastSentData.getBytes();
@@ -18,9 +19,9 @@ public class server {
         serverSocket.send(sendPacket);
     }
 
-    private static String receivePacketWithTimeout() throws Exception {
+    private static String receivePacketWithTimeout(int bytes) throws Exception {
         serverSocket.setSoTimeout(timeout);
-        byte[] receiveData = new byte[1];
+        byte[] receiveData = new byte[bytes];
         DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
 
         while (true) {
@@ -35,17 +36,17 @@ public class server {
         return new String(receivePacket.getData());
     }
 
-    private static String receivePacketNoTimeout() throws Exception {
+    private static String receivePacketNoTimeout(int bytes) throws Exception {
         serverSocket.setSoTimeout(0);
-        byte[] receiveData = new byte[1];
+        byte[] receiveData = new byte[bytes];
         DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
         serverSocket.receive(receivePacket);
         return new String(receivePacket.getData());
     }
 
-    private static String receivePacketNoTimeoutUpdateClient() throws Exception {
+    private static String receivePacketNoTimeoutUpdateClient(int bytes) throws Exception {
         serverSocket.setSoTimeout(0);
-        byte[] receiveData = new byte[1];
+        byte[] receiveData = new byte[bytes];
         DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
         serverSocket.receive(receivePacket);
         clientIpAddress = receivePacket.getAddress();
@@ -53,32 +54,34 @@ public class server {
         return new String(receivePacket.getData());
     }
 
+    private static void validateConnection() throws Exception {
+        while (true) {
+            lastReceivedContent = receivePacketNoTimeoutUpdateClient(7);
+            if(lastReceivedContent.equals("connect")) {
+                lastSentData = "ack";
+                sendPacket();
+                lastReceivedContent = receivePacketWithTimeout(3);
+                if(lastReceivedContent.equals("ack")) {
+                    System.out.println("Connection validated successfully!");
+                    break;
+                }
+            }
+        }
+    }
     public static void main(String[] args) throws Exception {
         // Path fileName = Path.of("/Users/joaobrentano/Documents/transfer.txt");
         // // Path fileName = Path.of("D://Eduardo//Documents//transfer.txt");
         // String data = Files.readString(fileName);
 
-        // Creates the server socket at the port 9877
+        // Creates the server socket at the chosen port 
         serverSocket = new DatagramSocket(serverPort);
-        String content;
 
         while (true) {
             // While to validate the connection
-            while (true) {
-                content = receivePacketNoTimeoutUpdateClient();
-                if(content.equals("c")) {
-                    lastSentData = "k";
-                    sendPacket();
-                    content = receivePacketWithTimeout();
-                    if(content.equals("k")) {
-                        System.out.println("Connection validated successfully!");
-                        break;
-                    }
-                }
-            }
+            validateConnection();
             // Awaits for game start packet
-            content = receivePacketNoTimeout();
-            if(content.equals("startGame")) {
+            lastReceivedContent = receivePacketNoTimeout(9);
+            if(lastReceivedContent.equals("startGame")) {
                 // Starts game
             }
             break;
