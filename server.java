@@ -1,7 +1,11 @@
 import java.net.*;
 import java.io.*;
+import java.util.List;
+import java.util.ArrayList;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
-public class server {
+public class Server {
 
     static final int serverPort = 9876;
     static final int timeout = 5000;
@@ -12,6 +16,20 @@ public class server {
 
     static String lastSentData;
     static String lastReceivedContent;
+
+    static List<Question> questions;
+
+    private static void buildQuestionsArray() throws IOException {
+        List<Question> questionList = new ArrayList<>();
+        Path file = Path.of("/questions.csv");
+        List<String> lines = Files.readAllLines(file);
+        for (String string : lines) {
+            String[] values = string.split(";");
+            Question question = new Question(values[0], values[1], values[2], values[3], values[4]);
+            questions.add(question);
+        }
+        questions = questionList;
+    }
 
     private static void sendPacket() throws Exception {
         byte[] sendData = lastSentData.getBytes();
@@ -57,34 +75,58 @@ public class server {
     private static void validateConnection() throws Exception {
         while (true) {
             lastReceivedContent = receivePacketNoTimeoutUpdateClient(7);
-            if(lastReceivedContent.equals("connect")) {
-                lastSentData = "ack";
+            if (lastReceivedContent.equals("connect")) {
+                lastSentData = "ack1";
                 sendPacket();
-                lastReceivedContent = receivePacketWithTimeout(3);
-                if(lastReceivedContent.equals("ack")) {
+                lastReceivedContent = receivePacketWithTimeout(4);
+                if (lastReceivedContent.equals("ack2")) {
                     System.out.println("Connection validated successfully!");
                     break;
                 }
             }
         }
     }
-    public static void main(String[] args) throws Exception {
-        // Path fileName = Path.of("/Users/joaobrentano/Documents/transfer.txt");
-        // // Path fileName = Path.of("D://Eduardo//Documents//transfer.txt");
-        // String data = Files.readString(fileName);
 
-        // Creates the server socket at the chosen port 
-        serverSocket = new DatagramSocket(serverPort);
+    public static void main(String[] args) throws Exception {
 
         while (true) {
-            // While to validate the connection
+            // Creates the server socket at the chosen port
+            serverSocket = new DatagramSocket(serverPort);
+            // Waits for a valid connection
+            System.out.println("Waiting for a valid connection");
             validateConnection();
+            // After this point the connection is validated, if a unknown response is
+            // received, the validation process must happen again
             // Awaits for game start packet
-            lastReceivedContent = receivePacketNoTimeout(9);
-            if(lastReceivedContent.equals("startGame")) {
-                // Starts game
+
+            // Starting game
+            boolean validResponse = true;
+            while (validResponse) {
+                System.out.println("Waiting for difficulty selection 1-3");
+                lastReceivedContent = receivePacketNoTimeout(1);
+                System.out.println("Received a package");
+                switch (lastReceivedContent) {
+
+                    case "1":
+                        System.out.println("Starting easy mode");
+                        break;
+
+                    case "2":
+                        System.out.println("Starting normal mode");
+                        break;
+
+                    case "3":
+                        System.out.println("Starting hard mode");
+                        break;
+
+                    default:
+                        System.out.println("Invalid response detected, ending connection...");
+                        validResponse = false;
+                        break;
+                }
             }
-            break;
+
+            serverSocket.close();
         }
     }
 }
