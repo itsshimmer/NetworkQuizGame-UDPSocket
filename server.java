@@ -3,7 +3,7 @@ import java.io.*;
 
 public class server {
 
-    static final int serverPort = 9877;
+    static final int serverPort = 9876;
     static final int timeout = 5000;
     static DatagramSocket serverSocket;
 
@@ -18,19 +18,38 @@ public class server {
         serverSocket.send(sendPacket);
     }
 
-    private static String receivePacket() throws Exception {
-        boolean received = false;
+    private static String receivePacketWithTimeout() throws Exception {
+        serverSocket.setSoTimeout(timeout);
         byte[] receiveData = new byte[1];
         DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
 
-        while (!received) {
+        while (true) {
             try {
                 serverSocket.receive(receivePacket);
             } catch (SocketTimeoutException e) {
                 sendPacket();
                 continue;
             }
+            break;
         }
+        return new String(receivePacket.getData());
+    }
+
+    private static String receivePacketNoTimeout() throws Exception {
+        serverSocket.setSoTimeout(0);
+        byte[] receiveData = new byte[1];
+        DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+        serverSocket.receive(receivePacket);
+        return new String(receivePacket.getData());
+    }
+
+    private static String receivePacketNoTimeoutUpdateClient() throws Exception {
+        serverSocket.setSoTimeout(0);
+        byte[] receiveData = new byte[1];
+        DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+        serverSocket.receive(receivePacket);
+        clientIpAddress = receivePacket.getAddress();
+        clientPort = receivePacket.getPort();
         return new String(receivePacket.getData());
     }
 
@@ -41,26 +60,27 @@ public class server {
 
         // Creates the server socket at the port 9877
         serverSocket = new DatagramSocket(serverPort);
+        String content;
 
         while (true) {
-
-            // while para validar a conexao
+            // While to validate the connection
             while (true) {
-                byte[] receiveData = new byte[1];
-                DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
-                serverSocket.receive(receivePacket);
-                String content = new String(receivePacket.getData());
+                content = receivePacketNoTimeoutUpdateClient();
                 if(content.equals("c")) {
-                    clientIpAddress = receivePacket.getAddress();
-                    clientPort = receivePacket.getPort();
-                    serverSocket.setSoTimeout(timeout);
                     lastSentData = "k";
                     sendPacket();
-                    break;
+                    content = receivePacketWithTimeout();
+                    if(content.equals("k")) {
+                        System.out.println("Connection validated successfully!");
+                        break;
+                    }
                 }
             }
-
-            // should await start game
+            // Awaits for game start packet
+            content = receivePacketNoTimeout();
+            if(content.equals("startGame")) {
+                // Starts game
+            }
             break;
         }
     }

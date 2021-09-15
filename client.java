@@ -6,7 +6,7 @@ import java.util.Scanner;
 public class client {
 
     static final String host = "localhost";
-    static final int serverPort = 9877;
+    static final int serverPort = 9876;
     static final int timeout = 5000;
     
     static DatagramSocket clientSocket;
@@ -21,17 +21,18 @@ public class client {
     }
 
     private static String receivePacket() throws Exception {
-        boolean received = false;
-        byte[] receiveData = new byte[15000];
+        byte[] receiveData = new byte[1];
         DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
 
-        while(!received) {
+        // while que controla o recebimento de resposta
+        while(true) {
             try {
                 clientSocket.receive(receivePacket);
             } catch (SocketTimeoutException e) {
                sendPacket();
                continue;
             }
+            break;
         }
         return new String(receivePacket.getData());
     }
@@ -49,13 +50,15 @@ public class client {
                 lastSentData = "c";
                 sendPacket();
                 String response = receivePacket();
-                System.out.println("got response:" + response);
                 if(response.equals("k")) {
+                    lastSentData = "k";
+                    sendPacket();
+                    System.out.println("Connection validated successfully!");
                     break;
                 }
             }
-            System.out.println("Conectado!");
-            //send start game packet
+
+            // Send start game packet
             break;
 
         }
