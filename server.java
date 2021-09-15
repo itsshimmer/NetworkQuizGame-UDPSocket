@@ -17,6 +17,24 @@ public class Server {
     static String lastSentData;
     static String lastReceivedContent;
 
+    private static class Question {
+
+        String question;
+        String correctAnswer;
+        String alternative1;
+        String alternative2;
+        String alternative3;
+    
+        public Question(String question, String correctAnswer, String alternative1, String alternative2, String alternative3) {
+            this.question = question;
+            this.correctAnswer = correctAnswer;
+            this.alternative1 = alternative1;
+            this.alternative2 = alternative2;
+            this.alternative3 = alternative3;
+        }
+    
+    }
+
     static List<Question> questions;
 
     private static void buildQuestionsArray() throws IOException {
@@ -89,6 +107,10 @@ public class Server {
 
     public static void main(String[] args) throws Exception {
 
+        // Reads csv and builds the questions array
+        buildQuestionsArray();
+
+        // Server run loop
         while (true) {
             // Creates the server socket at the chosen port
             serverSocket = new DatagramSocket(serverPort);
@@ -97,7 +119,6 @@ public class Server {
             validateConnection();
             // After this point the connection is validated, if a unknown response is
             // received, the validation process must happen again
-            // Awaits for game start packet
 
             // Starting game
             boolean validResponse = true;
@@ -125,7 +146,6 @@ public class Server {
                         break;
                 }
             }
-
             serverSocket.close();
         }
     }
