@@ -1,4 +1,5 @@
 import java.net.*;
+import java.util.InputMismatchException;
 import java.util.Scanner;
 
 public class Client {
@@ -11,6 +12,8 @@ public class Client {
     static InetAddress ipAddress;
 
     static String lastSentData;
+
+    static Scanner input;
 
     private static void sendPacket() throws Exception {
         byte[] sendData = lastSentData.getBytes();
@@ -49,29 +52,63 @@ public class Client {
         }
     }
 
+    private static int readValidInteger(int min, int max) {
+        while (true) {
+            System.out.println("Please input an integer between " + min + " and " + max + ":");
+            int integer;
+            try {
+                integer = input.nextInt();
+            } catch (InputMismatchException exception) {
+                continue;
+            }
+            if (integer < min || integer > max) {
+                continue;
+            }
+            return integer;
+        }
+    }
+
+    private static void awaitAck() throws Exception {
+        String receivedData;
+        receivedData = receivePacket(3);
+        if (!receivedData.equals("ack")) {
+            System.out.println("Invalid data received, exiting...");
+            System.exit(0);
+        }
+    }
+
     public static void main(String[] args) throws Exception {
 
         ipAddress = InetAddress.getByName(host);
-
-        // IO
-        Scanner input = new Scanner(System.in);
-        String localInput;
+        input = new Scanner(System.in);
 
         while (true) {
             clientSocket = new DatagramSocket();
             clientSocket.setSoTimeout(timeout);
 
-            System.out.println("trying to validate the connection");
+            int userInput;
+            String receivedData;
+
+            System.out.println("Trying to validate the connection with the server");
             validateConnection();
+            System.out.println("Starting game...");
 
-            localInput = input.nextLine();
-
-            if (localInput.equals("restart")) {
-                System.out.println("restarting client");
-            }
-
-            lastSentData = localInput;
+            // Difficulty selection
+            System.out.println("Please choose a difficulty level:");
+            System.out.println("1 - Easy");
+            System.out.println("2 - Medium");
+            System.out.println("3 - Hard");
+            userInput = readValidInteger(1, 3);
+            lastSentData = "" + userInput;
             sendPacket();
+            awaitAck();
+
+            // Amount of questions selection
+            System.out.println("How many questions should be asked this round(1-9)?");
+            userInput = readValidInteger(1, 9);
+            lastSentData = "" + userInput;
+            sendPacket();
+            awaitAck();
         }
     }
 }

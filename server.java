@@ -4,18 +4,22 @@ import java.util.List;
 import java.util.ArrayList;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Random;
 
 public class Server {
 
     static final int serverPort = 9876;
     static final int timeout = 5000;
-    static DatagramSocket serverSocket;
+    static final Random generator = new Random();
 
+    static DatagramSocket serverSocket;
     static InetAddress clientIpAddress;
     static int clientPort;
 
     static String lastSentData;
     static String lastReceivedContent;
+
+    static List<Question> questions;
 
     private static class Question {
 
@@ -24,29 +28,27 @@ public class Server {
         String alternative1;
         String alternative2;
         String alternative3;
-    
-        public Question(String question, String correctAnswer, String alternative1, String alternative2, String alternative3) {
+
+        public Question(String question, String correctAnswer, String alternative1, String alternative2,
+                String alternative3) {
             this.question = question;
             this.correctAnswer = correctAnswer;
             this.alternative1 = alternative1;
             this.alternative2 = alternative2;
             this.alternative3 = alternative3;
         }
-    
+
     }
 
-    static List<Question> questions;
-
     private static void buildQuestionsArray() throws IOException {
-        List<Question> questionList = new ArrayList<>();
-        Path file = Path.of("/questions.csv");
+        questions = new ArrayList<>();
+        Path file = Path.of("questions.csv");
         List<String> lines = Files.readAllLines(file);
         for (String string : lines) {
             String[] values = string.split(";");
             Question question = new Question(values[0], values[1], values[2], values[3], values[4]);
             questions.add(question);
         }
-        questions = questionList;
     }
 
     private static void sendPacket() throws Exception {
@@ -105,6 +107,18 @@ public class Server {
         }
     }
 
+    private static void sendAck() throws Exception {
+        lastSentData = "ack";
+        sendPacket();
+    }
+
+    private static boolean isValidInteger(int value, int min, int max) {
+        if(value < min || value > max) {
+            return false;
+        }
+        return true;
+    }
+
     public static void main(String[] args) throws Exception {
 
         // Reads csv and builds the questions array
@@ -127,17 +141,32 @@ public class Server {
                 lastReceivedContent = receivePacketNoTimeout(1);
                 System.out.println("Received a package");
                 switch (lastReceivedContent) {
-
                     case "1":
                         System.out.println("Starting easy mode");
+                        sendAck();
+                        System.out.println("Waiting for amount of questions 1-9");
+                        lastReceivedContent = receivePacketNoTimeout(1);
+                        int numberOfQuestions;
+                        try {
+
+                        }
+                        if(!isValidInteger(Integer.parseInt(lastReceivedContent), 1, 9)) {
+                            System.out.println("Invalid response detected, ending connection...");
+                            validResponse = false;
+                            break;
+                        }
+                        
+
                         break;
 
                     case "2":
                         System.out.println("Starting normal mode");
+                        sendAck();
                         break;
 
                     case "3":
                         System.out.println("Starting hard mode");
+                        sendAck();
                         break;
 
                     default:
