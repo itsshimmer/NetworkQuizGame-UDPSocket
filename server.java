@@ -18,6 +18,7 @@ public class Server {
 
     static String lastSentData;
     static String lastReceivedContent;
+    static boolean invalidDataDetected;
 
     static List<Question> questions;
 
@@ -112,11 +113,34 @@ public class Server {
         sendPacket();
     }
 
-    private static boolean isValidInteger(int value, int min, int max) {
-        if(value < min || value > max) {
-            return false;
+    private static void awaitAck() throws Exception {
+        String receivedData;
+        receivedData = receivePacketWithTimeout(3);
+        if (!receivedData.equals("ack")) {
+            invalidDataDetected = true;
         }
-        return true;
+    }
+
+    private static int getIntegerValue(String string, int min, int max) {
+        int value;
+        try {
+            value = Integer.parseInt(string);
+        } catch (Exception e) {
+            invalidDataDetected = true;
+            return -1;
+        }
+        if (value < min || value > max) {
+            invalidDataDetected = true;
+            return -1;
+        }
+        return value;
+    }
+
+    private static String shuffleAlternatives(Question question) {
+        // MARK: - TO DO
+        String questionString = question.question + ";" + question.correctAnswer + ";" + question.alternative1 + ";"
+                + question.alternative2 + ";" + question.alternative3;
+        return questionString;
     }
 
     public static void main(String[] args) throws Exception {
@@ -128,53 +152,79 @@ public class Server {
         while (true) {
             // Creates the server socket at the chosen port
             serverSocket = new DatagramSocket(serverPort);
+            invalidDataDetected = false;
             // Waits for a valid connection
             System.out.println("Waiting for a valid connection");
             validateConnection();
             // After this point the connection is validated, if a unknown response is
             // received, the validation process must happen again
 
-            // Starting game
-            boolean validResponse = true;
-            while (validResponse) {
-                System.out.println("Waiting for difficulty selection 1-3");
+            int difficulty;
+
+            // Gets difficulty
+            System.out.println("Waiting for difficulty selection 1-3");
+            lastReceivedContent = receivePacketNoTimeout(1);
+            System.out.println("Received a package");
+            difficulty = getIntegerValue(lastReceivedContent, 1, 3);
+
+            if (invalidDataDetected) {
+                System.out.println("Invalid data detected, disconnecting...");
+                serverSocket.close();
+                continue;
+            }
+            sendAck();
+
+            // Loop for fetching questions
+            int userPoints = 0;
+            boolean shouldKeepReceiving = true;
+            while (shouldKeepReceiving) {
+                System.out.println("Waiting for question or ending request");
                 lastReceivedContent = receivePacketNoTimeout(1);
                 System.out.println("Received a package");
                 switch (lastReceivedContent) {
-                    case "1":
-                        System.out.println("Starting easy mode");
+                    case "q":
                         sendAck();
-                        System.out.println("Waiting for amount of questions 1-9");
+                        Question question = questions.get(generator.nextInt(questions.size()));
+                        String questionString = shuffleAlternatives(question);
+                        lastSentData = questionString;
+                        sendPacket();
+                        awaitAck();
+                        System.out.println("Waiting for user response selection 1 - diffculty+1");
                         lastReceivedContent = receivePacketNoTimeout(1);
-                        int numberOfQuestions;
-                        try {
+                        System.out.println("Received a package" + lastReceivedContent);
+                        int userChosen = getIntegerValue(lastReceivedContent, 1, difficulty + 1);
 
+                        if (invalidDataDetected) {
+                            System.out.println("Invalid data detected, disconnecting...");
+                            shouldKeepReceiving = false;
+                            serverSocket.close();
+                            continue;
                         }
-                        if(!isValidInteger(Integer.parseInt(lastReceivedContent), 1, 9)) {
-                            System.out.println("Invalid response detected, ending connection...");
-                            validResponse = false;
-                            break;
+                        sendAck();
+                        lastSentData = "f";
+                        // MARK: - TO DO Validate response
+                        if (userChosen == 1) {
+                            userPoints++;
+                            lastSentData = "t";
                         }
-                        
-
+                        sendPacket();
+                        awaitAck();
                         break;
-
-                    case "2":
-                        System.out.println("Starting normal mode");
+                    case "e":
                         sendAck();
+                        shouldKeepReceiving = false;
                         break;
-
-                    case "3":
-                        System.out.println("Starting hard mode");
-                        sendAck();
-                        break;
-
                     default:
-                        System.out.println("Invalid response detected, ending connection...");
-                        validResponse = false;
+                        System.out.println("Invalid data detected, disconnecting...");
+                        invalidDataDetected = true;
+                        shouldKeepReceiving = false;
                         break;
                 }
             }
+            lastSentData = "" + userPoints;
+            sendPacket();
+            awaitAck();
+            System.out.println("Finished match. Ending cycle...");
             serverSocket.close();
         }
     }

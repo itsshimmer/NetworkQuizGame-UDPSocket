@@ -68,6 +68,11 @@ public class Client {
         }
     }
 
+    private static void sendAck() throws Exception {
+        lastSentData = "ack";
+        sendPacket();
+    }
+
     private static void awaitAck() throws Exception {
         String receivedData;
         receivedData = receivePacket(3);
@@ -87,7 +92,6 @@ public class Client {
             clientSocket.setSoTimeout(timeout);
 
             int userInput;
-            String receivedData;
 
             System.out.println("Trying to validate the connection with the server");
             validateConnection();
@@ -104,11 +108,46 @@ public class Client {
             awaitAck();
 
             // Amount of questions selection
-            System.out.println("How many questions should be asked this round(1-9)?");
-            userInput = readValidInteger(1, 9);
-            lastSentData = "" + userInput;
+            System.out.println("How many questions should be asked this round(1-100)?");
+            int numberOfQuestions = readValidInteger(1, 100);
+
+            // Start asking questions
+            for (int index = 0; index < numberOfQuestions; index++) {
+                lastSentData = "q";
+                sendPacket();
+                awaitAck();
+                String receivedData = receivePacket(100);
+                sendAck();
+                String[] question = receivedData.split(";");
+                System.out.println("Question: " + question[0]);
+                for (int answers = 1; answers < question.length; answers++) {
+                    System.out.println(answers + ": " + question[answers]);
+                }
+                userInput = readValidInteger(1, question.length-1);
+                lastSentData = "" + userInput;
+                sendPacket();
+                awaitAck();
+
+                // Waits for server chosen response validation
+                receivedData = receivePacket(1);
+                sendAck();
+                if (receivedData.equals("t")) {
+                    System.out.println("Correct!");
+                } else if (receivedData.equals("f")) {
+                    System.out.println("Wrong!");
+                } else {
+                    System.out.println("Invalid data received, exiting...");
+                    System.exit(0);
+                }
+            }
+            lastSentData = "e";
             sendPacket();
             awaitAck();
+
+            String finalScore = receivePacket(3);
+            sendAck();
+            System.out.println("Finished match! Your score was: " + finalScore);
+            System.out.println("Restarting client...");
         }
     }
 }
