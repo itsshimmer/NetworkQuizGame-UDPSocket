@@ -51,6 +51,28 @@ public class Server {
 		}
 	}
 
+	private static int getIntegerValue(String string, int min, int max) {
+		int value;
+		try {
+			value = Integer.parseInt(string);
+		} catch (Exception e) {
+			invalidDataDetected = true;
+			return -1;
+		}
+		if (value < min || value > max) {
+			invalidDataDetected = true;
+			return -1;
+		}
+		return value;
+	}
+
+	private static String shuffleAlternatives(Question question) {
+		// MARK: - TO DO
+		String questionString = question.question + ";" + question.correctAnswer + ";" + question.alternative1 + ";"
+				+ question.alternative2 + ";" + question.alternative3;
+		return questionString;
+	}
+
 	private static void sendPacket() throws Exception {
 		byte[] sendData = lastSentData.getBytes();
 		DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, clientIpAddress, clientPort);
@@ -92,6 +114,24 @@ public class Server {
 		return new String(receivePacket.getData());
 	}
 
+	private static void sendAck() throws Exception {
+		lastSentData = "ack";
+		sendPacket();
+	}
+
+	private static void awaitAck() throws Exception {
+		String receivedData;
+
+		// Tries to receive ACK correctly
+		while (true) {
+			receivedData = receivePacketWithTimeout(3);
+			if (receivedData.equals("ack")) {
+				break;
+			}
+			System.out.println("Invalid data received, retrying to receive ack...");
+		}
+	}
+
 	private static void validateConnection() throws Exception {
 		while (true) {
 			lastReceivedContent = receivePacketNoTimeoutUpdateClient(7);
@@ -106,99 +146,75 @@ public class Server {
 			}
 		}
 	}
-
-	private static void sendAck() throws Exception {
-		lastSentData = "ack";
-		sendPacket();
-	}
-
-	private static void awaitAck() throws Exception {
-		String receivedData;
-		receivedData = receivePacketWithTimeout(3);
-		if (!receivedData.equals("ack")) {
-			invalidDataDetected = true;
-		}
-	}
-
-	private static int getIntegerValue(String string, int min, int max) {
-		int value;
-		try {
-			value = Integer.parseInt(string);
-		} catch (Exception e) {
-			invalidDataDetected = true;
-			return -1;
-		}
-		if (value < min || value > max) {
-			invalidDataDetected = true;
-			return -1;
-		}
-		return value;
-	}
-
-	private static String shuffleAlternatives(Question question) {
-		// MARK: - TO DO
-		String questionString = question.question + ";" + question.correctAnswer + ";" + question.alternative1 + ";"
-				+ question.alternative2 + ";" + question.alternative3;
-		return questionString;
-	}
-
 	public static void main(String[] args) throws Exception {
+
 		// Reads csv and builds the questions array
 		buildQuestionsArray();
 
-		// Server run loop
+		// Server main loop
 		while (true) {
+
+			// Setting up
+			int difficulty;
+			int userPoints = 0;
+			int userChosen;
+			boolean shouldKeepReceiving = true;
+			invalidDataDetected = false;
+
 			// Creates the server socket at the chosen port
 			serverSocket = new DatagramSocket(serverPort);
-			invalidDataDetected = false;
+
 			// Waits for a valid connection
 			System.out.println("Waiting for a valid connection");
 			validateConnection();
-			// After this point the connection is validated, if a unknown response is
-			// received, the validation process must happen again
-
-			int difficulty;
 
 			// Gets difficulty
 			System.out.println("Waiting for difficulty selection 1-3");
-			lastReceivedContent = receivePacketNoTimeout(1);
-			System.out.println("Received a package");
-			difficulty = getIntegerValue(lastReceivedContent, 1, 3);
 
-			if (invalidDataDetected) {
-				System.out.println("Invalid data detected, disconnecting...");
-				serverSocket.close();
-				continue;
+			// Tries to receive the difficulty data correctly
+			while (true) {
+				lastReceivedContent = receivePacketNoTimeout(1);
+				difficulty = getIntegerValue(lastReceivedContent, 1, 3);
+				if (!invalidDataDetected) {
+					sendAck();
+					break;
+				}
+				invalidDataDetected = false;
 			}
-			sendAck();
 
-			// Loop for fetching questions
-			int userPoints = 0;
-			boolean shouldKeepReceiving = true;
+			// Secondary loop for fetching questions for as long as the client wants
 			while (shouldKeepReceiving) {
 				System.out.println("Waiting for question or ending request");
 				lastReceivedContent = receivePacketNoTimeout(1);
-				System.out.println("Received a package");
+				System.out.println("Received a package: " + lastReceivedContent);
 				switch (lastReceivedContent) {
 					case "q":
 						sendAck();
+						// Fetches a random question and builds the questionString
 						Question question = questions.get(generator.nextInt(questions.size()));
 						String questionString = shuffleAlternatives(question);
+
+						// Sends question and waits for an ACK
 						lastSentData = questionString;
 						sendPacket();
 						awaitAck();
-						System.out.println("Waiting for user response selection 1 - diffculty+1");
-						lastReceivedContent = receivePacketNoTimeout(1);
-						System.out.println("Received a package" + lastReceivedContent);
-						int userChosen = getIntegerValue(lastReceivedContent, 1, difficulty + 1);
 
-						if (invalidDataDetected) {
-							System.out.println("Invalid data detected, disconnecting...");
-							shouldKeepReceiving = false;
-							serverSocket.close();
-							break;
+						// Tries to receive the chosen response correctly
+						System.out.println(
+								"Waiting for the user chosen alternative, valid inputs: from 1 to " + (difficulty+1));
+						while (true) {
+							lastReceivedContent = receivePacketNoTimeout(1);
+							userChosen = getIntegerValue(lastReceivedContent, 1, difficulty + 1);
+							if (!invalidDataDetected) {
+								sendAck();
+								break;
+							}
+							invalidDataDetected = false;
 						}
-						sendAck();
+						System.out.println("Received the chosen alternative: " + userChosen);
+
+						// Defaults to wrong alternative, if valid changes packet data to "t" and adds
+						// to user points
 						lastSentData = "f";
 						// MARK: - TO DO Validate response
 						if (userChosen == 1) {
@@ -213,17 +229,16 @@ public class Server {
 						shouldKeepReceiving = false;
 						break;
 					default:
-						System.out.println("Invalid data detected, disconnecting...");
-						invalidDataDetected = true;
-						shouldKeepReceiving = false;
+						System.out.println("Invalid data detected, wating for a question or ending request...");
 						break;
 				}
 			}
-			if (!invalidDataDetected) {
-				lastSentData = "" + userPoints;
-				sendPacket();
-				awaitAck();
-			}
+			// Ends game by sending the user score to the client
+			lastSentData = "" + userPoints;
+			sendPacket();
+			awaitAck();
+
+			// Closes socket and restarts loop
 			System.out.println("Finished match. Ending cycle...");
 			serverSocket.close();
 		}

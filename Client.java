@@ -20,12 +20,11 @@ public class Client {
 		DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, ipAddress, serverPort);
 		clientSocket.send(sendPacket);
 	}
-
+	
 	private static String receivePacket(int bytes) throws Exception {
 		byte[] receiveData = new byte[bytes];
 		DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
-
-		// while que controla o recebimento de resposta
+		
 		while (true) {
 			try {
 				clientSocket.receive(receivePacket);
@@ -36,6 +35,24 @@ public class Client {
 			break;
 		}
 		return new String(receivePacket.getData());
+	}
+	
+	private static void sendAck() throws Exception {
+		lastSentData = "ack";
+		sendPacket();
+	}
+
+	private static void awaitAck() throws Exception {
+		String receivedData;
+
+		// Tries to receive ACK correctly
+		while (true) {
+			receivedData = receivePacket(3);
+			if (receivedData.equals("ack")) {
+				break;
+			}
+			System.out.println("Invalid data received, retrying to receive ack...");
+		}
 	}
 
 	private static void validateConnection() throws Exception {
@@ -67,37 +84,25 @@ public class Client {
 			return integer;
 		}
 	}
-
-	private static void sendAck() throws Exception {
-		lastSentData = "ack";
-		sendPacket();
-	}
-
-	private static void awaitAck() throws Exception {
-		String receivedData;
-		receivedData = receivePacket(3);
-		if (!receivedData.equals("ack")) {
-			System.out.println("Invalid data received, exiting...");
-			System.exit(0);
-		}
-	}
-
 	public static void main(String[] args) throws Exception {
 
+		// Setting up the client
 		ipAddress = InetAddress.getByName(host);
 		input = new Scanner(System.in);
 
+		// Main client loop
 		while (true) {
+
+			// Setting up a new game connection
 			clientSocket = new DatagramSocket();
 			clientSocket.setSoTimeout(timeout);
-
 			int userInput;
 
 			System.out.println("Trying to validate the connection with the server");
 			validateConnection();
 			System.out.println("Starting game...");
 
-			// Difficulty selection
+			// Difficulty selection and sending to the server
 			System.out.println("Please choose a difficulty level:");
 			System.out.println("1 - Easy");
 			System.out.println("2 - Medium");
@@ -113,21 +118,36 @@ public class Client {
 
 			// Start asking questions
 			for (int index = 0; index < numberOfQuestions; index++) {
+
+				// Asks the server for a question
 				lastSentData = "q";
 				sendPacket();
 				awaitAck();
-				String receivedData = receivePacket(100);
-				sendAck();
+
+				// Tries to receive the question data correctly
+				String receivedData;
+				while (true) {
+					receivedData = receivePacket(100);
+					if (receivedData.length() > 10) {
+						sendAck();
+						break;
+					}
+				}
+
+				// Prints out the received question
 				String[] question = receivedData.split(";");
 				System.out.println("Question: " + question[0]);
 				for (int answers = 1; answers < question.length; answers++) {
 					System.out.println(answers + ": " + question[answers]);
 				}
+
+				// Collects the user's answer and sends it back to the server
 				userInput = readValidInteger(1, question.length - 1);
 				lastSentData = "" + userInput;
 				sendPacket();
 				awaitAck();
-				// Waits for server chosen response validation
+
+				// Tries to receive the chosen response grading (correct or wrong) correctly
 				while (true) {
 					receivedData = receivePacket(1);
 					if (receivedData.equals("t")) {
@@ -143,12 +163,23 @@ public class Client {
 					}
 				}
 			}
+
+			// Sends a packet to the server to request the ending of the game
 			lastSentData = "e";
 			sendPacket();
 			awaitAck();
 
-			String finalScore = receivePacket(3);
-			sendAck();
+			// Tries to receive the final score of the game correctly
+			String finalScore;
+			while (true) {
+				finalScore = receivePacket(3);
+				if (finalScore.length() == 3) {
+					sendAck();
+					break;
+				}
+			}
+
+			// Prints out the score and restarts the client
 			System.out.println("Finished match! Your score was: " + finalScore);
 			System.out.println("Restarting client...");
 		}
