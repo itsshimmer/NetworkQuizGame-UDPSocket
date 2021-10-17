@@ -342,7 +342,7 @@ public class Server {
 				// Defaults to wrong alternative, if valid changes packet data to "t" and adds
 				// to user points
 				clientTwoLastSentData = "f";
-				// Currently the correct answer is always number Two
+				// Currently the correct answer is always number one
 				if (userChosen == 1) {
 					clientTwoPoints++;
 					clientTwoLastSentData = "t";
