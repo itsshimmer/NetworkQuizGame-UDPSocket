@@ -11,6 +11,7 @@ public class Server {
 	static final int clientOneServerPort = 9876;
 	static final int clientTwoServerPort = 9877;
 	static final int timeout = 5000;
+	static int difficulty;
 	static final Random generator = new Random();
 
 	static DatagramSocket clientOneServerSocket;
@@ -33,17 +34,16 @@ public class Server {
 
 		String question;
 		String correctAnswer;
-		String alternative1;
-		String alternative2;
-		String alternative3;
+		String[] alternatives;
 
 		public Question(String question, String correctAnswer, String alternative1, String alternative2,
 				String alternative3) {
 			this.question = question;
 			this.correctAnswer = correctAnswer;
-			this.alternative1 = alternative1;
-			this.alternative2 = alternative2;
-			this.alternative3 = alternative3;
+			this.alternatives = new String[3];
+			this.alternatives[0] = alternative1;
+			this.alternatives[1] = alternative2;
+			this.alternatives[2] = alternative3;
 		}
 	}
 
@@ -60,8 +60,10 @@ public class Server {
 
 	private static String shuffleAlternatives(Question question) {
 		// MARK: - TO DO
-		String questionString = question.question + ";" + question.correctAnswer + ";" + question.alternative1 + ";"
-				+ question.alternative2 + ";" + question.alternative3;
+		String questionString = question.question + ";" + question.correctAnswer;
+		for(int alternatives = 0; alternatives < difficulty; alternatives++) {
+			questionString += ";" + question.alternatives[alternatives];
+		}
 		return questionString;
 	}
 
@@ -251,7 +253,7 @@ public class Server {
 		while (true) {
 
 			// Setting up
-			int difficulty;
+			difficulty = -1;
 			int clientOnePoints = 0;
 			int clientTwoPoints = 0;
 			int userChosen;
