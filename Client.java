@@ -5,7 +5,7 @@ import java.util.Scanner;
 public class Client {
 
 	static final String host = "localhost";
-	static final int serverPort = 9876;
+	static int serverPort = 9876;
 	static final int timeout = 5000;
 
 	static DatagramSocket clientSocket;
@@ -20,11 +20,11 @@ public class Client {
 		DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, ipAddress, serverPort);
 		clientSocket.send(sendPacket);
 	}
-	
+
 	private static String receivePacket(int bytes) throws Exception {
 		byte[] receiveData = new byte[bytes];
 		DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
-		
+
 		while (true) {
 			try {
 				clientSocket.receive(receivePacket);
@@ -36,7 +36,7 @@ public class Client {
 		}
 		return new String(receivePacket.getData());
 	}
-	
+
 	private static void sendAck() throws Exception {
 		lastSentData = "ack";
 		sendPacket();
@@ -84,6 +84,7 @@ public class Client {
 			return integer;
 		}
 	}
+
 	public static void main(String[] args) throws Exception {
 
 		// Setting up the client
@@ -99,30 +100,29 @@ public class Client {
 			int userInput;
 
 			System.out.println("Trying to validate the connection with the server");
-			validateConnection();
 			System.out.println("Starting game...");
 
-			// Difficulty selection and sending to the server
-			System.out.println("Please choose a difficulty level:");
-			System.out.println("1 - Easy");
-			System.out.println("2 - Medium");
-			System.out.println("3 - Hard");
-			userInput = readValidInteger(1, 3);
-			lastSentData = "" + userInput;
-			sendPacket();
-			awaitAck();
-
-			// Amount of questions selection
-			System.out.println("How many questions should be asked this round(1-100)?");
-			int numberOfQuestions = readValidInteger(1, 100);
-
-			// Start asking questions
-			for (int index = 0; index < numberOfQuestions; index++) {
-
-				// Asks the server for a question
-				lastSentData = "q";
+			// Asks if the client is player 1 or 2
+			System.out.println("Are you player 1 or 2?");
+			userInput = readValidInteger(1, 2);
+			if (userInput == 2) {
+				serverPort++;
+				validateConnection();
+			} else {
+				validateConnection();
+				// Difficulty selection and sending to the server
+				System.out.println("Please choose a difficulty level:");
+				System.out.println("1 - Easy");
+				System.out.println("2 - Medium");
+				System.out.println("3 - Hard");
+				userInput = readValidInteger(1, 3);
+				lastSentData = "" + userInput;
 				sendPacket();
 				awaitAck();
+			}
+
+			// Start asking questions
+			for (int index = 0; index < 10; index++) {
 
 				// Tries to receive the question data correctly
 				String receivedData;
@@ -164,23 +164,18 @@ public class Client {
 				}
 			}
 
-			// Sends a packet to the server to request the ending of the game
-			lastSentData = "e";
-			sendPacket();
-			awaitAck();
-
 			// Tries to receive the final score of the game correctly
 			String finalScore;
 			while (true) {
-				finalScore = receivePacket(3);
-				if (finalScore.length() == 3) {
+				finalScore = receivePacket(37);
+				if (finalScore.length() == 37) {
 					sendAck();
 					break;
 				}
 			}
 
 			// Prints out the score and restarts the client
-			System.out.println("Finished match! Your score was: " + finalScore);
+			System.out.println("Finished match! " + finalScore);
 			System.out.println("Restarting client...");
 		}
 	}
