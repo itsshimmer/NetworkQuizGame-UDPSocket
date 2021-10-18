@@ -59,7 +59,7 @@ public class Server {
 	}
 
 	private static String shuffleAlternatives(Question question) {
-		// MARK: - TO DO
+		// Number of alterantives is ok, should shuffle order
 		String questionString = question.question + ";" + question.correctAnswer;
 		for(int alternatives = 0; alternatives < difficulty; alternatives++) {
 			questionString += ";" + question.alternatives[alternatives];

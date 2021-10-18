@@ -99,16 +99,18 @@ public class Client {
 			clientSocket.setSoTimeout(timeout);
 			int userInput;
 
-			System.out.println("Trying to validate the connection with the server");
 			System.out.println("Starting game...");
 
 			// Asks if the client is player 1 or 2
 			System.out.println("Are you player 1 or 2?");
 			userInput = readValidInteger(1, 2);
 			if (userInput == 2) {
-				serverPort++;
+				serverPort = 9877;
+				System.out.println("Trying to validate the connection with the server");
 				validateConnection();
 			} else {
+				serverPort = 9876;
+				System.out.println("Trying to validate the connection with the server");
 				validateConnection();
 				// Difficulty selection and sending to the server
 				System.out.println("Please choose a difficulty level:");
@@ -162,6 +164,7 @@ public class Client {
 						System.out.println("Invalid data received, retrying receive...");
 					}
 				}
+
 			}
 
 			// Tries to receive the final score of the game correctly
